@@ -9,7 +9,6 @@
 	"scripts": {
 		"build": "node scripts/build.ts"
 	},
-	"peerDependencies": {},
 	"dependencies": {
 		"mutative": "^2.0.1",
 		"yargs": "^18.2.0"
@@ -18,5 +17,7 @@
 		"@types/node": "^26.6.6",
 		"@types/yargs": "^17.0.35",
 		"dprint": "^0.64.3"
-	}
+	},
+	"peerDependencies": {},
+	"engines": { "node": ">=24" }
 }

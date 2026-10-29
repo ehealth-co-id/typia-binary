@@ -10,34 +10,34 @@ import packageJson from "../package.json" with { type: "json" };
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
-const { seed, out, packageName, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } = await yargs(
-	process.argv,
-)
-	.option("build-version-ttsc", { type: "string", default: "0.30.4" })
-	.option("build-version-typescript", { type: "string", default: "7.0.2" })
-	.option("build-version-typia", { type: "string", default: "15.0.1" })
-	.option("package-name", {
-		alias: "p",
-		type: "string",
-		default: "typia-binary",
-	})
-	.option("package-version", {
-		alias: "v",
-		type: "string",
-		default: packageJson.version,
-	})
-	.option("out", {
-		alias: "o",
-		type: "string",
-		default: p("dist"),
-		description: "Output directory",
-	})
-	.option("seed", {
-		type: "string",
-		description: "Seed plugins from directory",
-	})
-	.parseAsync();
+const { seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
+	await yargs(
+		process.argv,
+	)
+		.option("build-version-ttsc", { type: "string", default: "0.30.4" })
+		.option("build-version-typescript", { type: "string", default: "7.0.2" })
+		.option("build-version-typia", { type: "string", default: "15.0.1" })
+		.option("package-name", {
+			type: "string",
+			default: "typia-binary",
+		})
+		.option("package-version", {
+			type: "string",
+			default: packageJson.version,
+		})
+		.option("out", {
+			alias: "o",
+			type: "string",
+			default: p("dist"),
+			description: "Output directory",
+		})
+		.option("seed", {
+			type: "string",
+			description: "Seed plugins from directory",
+		})
+		.parseAsync();
 
+if (out === root || out.startsWith(p("package") + path.sep)) throw new Error(`Refusing to clean ${out}`);
 await fs.rm(out, { force: true, recursive: true });
 await fs.cp(p("package"), out, { force: true, recursive: true });
 await fs.writeFile(
@@ -45,6 +45,7 @@ await fs.writeFile(
 	JSON.stringify(
 		create(packageJson, draft => {
 			draft.name = `${packageName}-${process.platform}-${process.arch}`;
+			draft.version = packageVersion;
 
 			draft.bin = {
 				"typia-binary": "bin/typia-binary.mjs",
@@ -58,6 +59,9 @@ await fs.writeFile(
 				"package.json",
 				"README.md",
 			] as never[];
+
+			// @ts-expect-error
+			delete draft.engines.node;
 
 			// @ts-expect-error
 			delete draft.scripts.build;
@@ -137,12 +141,15 @@ async function keysIn(dir: string) {
 		.then(dirs => {
 			return Promise.all(
 				dirs
-					.filter((entry) => entry.isDirectory())
-					.map((entry) => fs.stat(path.join(dir, entry.name, "plugin")).then(e => [entry, e] as const)),
+					.map((entry) =>
+						fs.stat(path.join(dir, entry.name, "plugin"))
+							.then(e => [entry, e] as const)
+							.catch(v => [entry, null] as const)
+					),
 			)
 				.then((entry) =>
 					entry
-						.filter(([_, plugin]) => plugin.isFile())
+						.filter(([dir, plugin]) => plugin?.isFile())
 						.map(([dir]) => dir.name)
 				);
 		});
