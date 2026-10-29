@@ -10,6 +10,9 @@ import packageJson from "../package.json" with { type: "json" };
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
+// ttsc names the compiled plugin `plugin`, except on Windows where it is `plugin.exe`.
+const BINARY = process.platform === "win32" ? "plugin.exe" : "plugin";
+
 const { from: seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
 	await yargs(
 		process.argv,
@@ -118,7 +121,7 @@ if (seed) {
 	await fs.mkdir(path.join(out, "plugins"), { recursive: true });
 	for (const key of pluginKeys) {
 		await fs.mkdir(path.join(out, "plugins", key), { recursive: true });
-		await fs.cp(path.join(source, key, "plugin"), path.join(out, "plugins", key, "plugin"));
+		await fs.cp(path.join(source, key, BINARY), path.join(out, "plugins", key, BINARY));
 	}
 	console.log(`seeded from ${source}`);
 } else {
@@ -147,7 +150,7 @@ async function keysIn(dir: string) {
 			return Promise.all(
 				dirs
 					.map((entry) =>
-						fs.stat(path.join(dir, entry.name, "plugin"))
+						fs.stat(path.join(dir, entry.name, BINARY))
 							.then(e => [entry, e] as const)
 							.catch(() => [entry, null] as const)
 					),
@@ -162,7 +165,7 @@ async function keysIn(dir: string) {
 
 async function getPlugins(dir: string) {
 	const keys = await keysIn(dir);
-	if (!keys.length) throw new Error("no plugin binary produced or found");
+	if (!keys.length) throw new Error(`no ${BINARY} produced or found in ${dir}`);
 
 	return keys;
 }

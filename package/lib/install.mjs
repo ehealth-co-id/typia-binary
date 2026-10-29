@@ -9,7 +9,13 @@ const pkgVersion = (name, from) => {
 	let dir = from;
 	while (true) {
 		const file = path.join(dir, "node_modules", name, "package.json");
-		if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, "utf8")).version;
+		if (fs.existsSync(file)) {
+			try {
+				return JSON.parse(fs.readFileSync(file, "utf8")).version;
+			} catch {
+				return null;
+			}
+		}
 		const up = path.dirname(dir);
 		if (up === dir) return null;
 		dir = up;
@@ -22,12 +28,21 @@ const cacheRoot = (consumer, cacheDir) => {
 	return path.join(consumer, "node_modules", ".cache", "ttsc");
 };
 
+// ttsc writes `plugin.exe` on Windows, `plugin` everywhere else.
+const binaryName = process.platform === "win32" ? "plugin.exe" : "plugin";
+
 export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 	const Console = logger(quiet);
 
 	// Absent in a source checkout that has not been built yet; nothing to install then.
 	if (!fs.existsSync(path.join(pkgRoot, "build.json"))) return false;
-	const meta = JSON.parse(fs.readFileSync(path.join(pkgRoot, "build.json"), "utf8"));
+	let meta;
+	try {
+		meta = JSON.parse(fs.readFileSync(path.join(pkgRoot, "build.json"), "utf8"));
+	} catch {
+		Console.warn("typia-binary: build.json is unreadable; skipping cache warm");
+		return false;
+	}
 	// npm/yarn set INIT_CWD; ttsc resolves its cache root from the workspace root, which is what this is.
 	const consumer = process.env.INIT_CWD || process.cwd();
 
@@ -49,8 +64,8 @@ export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 
 	const src = path.join(pkgRoot, "plugins");
 	const dest = path.join(cacheRoot(consumer, cacheDir), "plugins");
-	const keys = meta.keys.filter((key) => fs.existsSync(path.join(src, key, "plugin")));
-	const todo = keys.filter((key) => force || !fs.existsSync(path.join(dest, key, "plugin")));
+	const keys = meta.keys.filter((key) => fs.existsSync(path.join(src, key, binaryName)));
+	const todo = keys.filter((key) => force || !fs.existsSync(path.join(dest, key, binaryName)));
 
 	if (!todo.length) {
 		Console.log(`typia-binary: cache already warm at ${dest}`);

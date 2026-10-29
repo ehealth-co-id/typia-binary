@@ -7,15 +7,28 @@ on:
         description: "npm publish --dry-run only (no registry write)"
         type: boolean
         default: false
+      package_version:
+        description: "Version to publish. Leave empty on a v* tag to use the tag."
+        type: string
+        default: ""
   push:
     tags: ["v*"]
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    strategy:
+      # 64-bit runners only. One linux-x64 artifact covers every distro: the plugin is
+      # statically linked, so glibc and musl both run it — no per-distro matrix needed.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       id-token: write # npm provenance
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +38,38 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      - run: npm ci
+      # build.ts imports only yargs + mutative (dependencies). --omit=dev also keeps
+      # dprint's per-platform optional binaries out of the install.
+      - run: npm ci --omit=dev
 
+      # dist/package.json is the published manifest: name and version both come from it.
+      # Never export an empty TYPIA_BUILD_*: it overrides build.ts's default with "".
+      - name: resolve version
+        run: |
+          v="${VERSION#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || {
+            echo "::error::no publishable version: pass package_version, or push a v* tag (got '$VERSION')"
+            exit 1
+          }
+          echo "TYPIA_BUILD_PACKAGE_VERSION=$v" >> "$GITHUB_ENV"
+        env:
+          VERSION: ${{ inputs.package_version || github.ref_name }}
+
+      # Cold Go build. Do NOT set CGO_ENABLED here: ttsc hashes `go env CGO_ENABLED`
+      # into the cache key, so forcing 0 would make every consumer's default-1 key miss.
       - run: npm run build
 
+      # On linux one artifact has to serve glibc and musl alike; a dynamic binary would
+      # quietly stop working on Alpine, so fail instead of publishing one.
+      - if: runner.os == 'Linux'
+        run: file dist/plugins/*/plugin | grep -q 'statically linked'
+
+      # "./dist" and not "dist": a bare name resolves as a registry package spec.
       - name: publish
         run: |
           test -s dist/build.json
           test -d dist/plugins
-          npm publish ./dist --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
+          npm publish ./dist --provenance --access public $DRY_RUN
         env:
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
