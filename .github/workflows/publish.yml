@@ -15,13 +15,36 @@ on:
     tags: ["v*"]
 
 jobs:
-  publish:
+  version:
+    # Resolved once: the platform packages and the umbrella must carry the same version.
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.resolve.outputs.value }}
+    steps:
+      - id: resolve
+        run: |
+          v="${VERSION#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || {
+            echo "::error::no publishable version: pass package_version, or push a v* tag (got '$VERSION')"
+            exit 1
+          }
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ inputs.package_version || github.ref_name }}
+
+  platform:
+    needs: version
     strategy:
-      # 64-bit runners only. One linux-x64 artifact covers every distro: the plugin is
-      # statically linked, so glibc and musl both run it — no per-distro matrix needed.
+      # 64-bit runners only, and each name has to appear in package.json typiaBinary
+      # .platforms or scripts/build.ts refuses the build.
+      # macos-latest is arm64, so the x64 leg has to name an Intel runner explicitly
+      # (the successor is macos-26-intel).
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-15-intel
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -29,6 +52,9 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      TYPIA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
+      DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,38 +64,56 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      # build.ts imports only yargs + mutative (dependencies). --omit=dev also keeps
-      # dprint's per-platform optional binaries out of the install.
       - run: npm ci --omit=dev
 
-      # dist/package.json is the published manifest: name and version both come from it.
-      # Never export an empty TYPIA_BUILD_*: it overrides build.ts's default with "".
-      - name: resolve version
-        run: |
-          v="${VERSION#v}"
-          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || {
-            echo "::error::no publishable version: pass package_version, or push a v* tag (got '$VERSION')"
-            exit 1
-          }
-          echo "TYPIA_BUILD_PACKAGE_VERSION=$v" >> "$GITHUB_ENV"
-        env:
-          VERSION: ${{ inputs.package_version || github.ref_name }}
-
-      # Cold Go build. Do NOT set CGO_ENABLED here: ttsc hashes `go env CGO_ENABLED`
-      # into the cache key, so forcing 0 would make every consumer's default-1 key miss.
+      # Cold Go build. Do NOT set CGO_ENABLED: ttsc hashes `go env CGO_ENABLED` into the
+      # cache key, so forcing 0 would make every consumer's default-1 key miss.
       - run: npm run build
 
-      # On linux one artifact has to serve glibc and musl alike; a dynamic binary would
+      # One linux artifact has to serve glibc and musl alike; a dynamic binary would
       # quietly stop working on Alpine, so fail instead of publishing one.
       - if: runner.os == 'Linux'
         run: file dist/plugins/*/plugin | grep -q 'statically linked'
 
-      # "./dist" and not "dist": a bare name resolves as a registry package spec.
       - name: publish
         run: |
           test -s dist/build.json
           test -d dist/plugins
           npm publish ./dist --provenance --access public $DRY_RUN
         env:
-          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  umbrella:
+    # Needs the platform packages to exist on the registry first: the published umbrella
+    # points at exactly these versions.
+    needs: [version, platform]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    defaults:
+      run:
+        shell: bash
+    env:
+      TYPIA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
+      DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Metadata only — no Go toolchain, no compile.
+      - run: npm ci --omit=dev
+
+      - run: npm run umbrella
+
+      - name: publish
+        run: |
+          test -s dist-umbrella/package.json
+          npm publish ./dist-umbrella --provenance --access public $DRY_RUN
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

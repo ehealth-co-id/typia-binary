@@ -1,9 +1,31 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./log.mjs";
 
-const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
+const ownRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// The umbrella ships no binaries: npm installs whichever of its os/cpu-matched
+// optionalDependencies resolve on this machine. A platform package installed on its own
+// still works, because then its own root is the one holding build.json.
+const artifactRoot = () => {
+	const roots = [ownRoot];
+	try {
+		const manifest = JSON.parse(fs.readFileSync(path.join(ownRoot, "package.json"), "utf8"));
+		for (const name of Object.keys(manifest.optionalDependencies ?? {})) {
+			try {
+				roots.push(path.dirname(require.resolve(`${name}/package.json`)));
+			} catch {
+				// not installed for this platform
+			}
+		}
+	} catch {
+		// unreadable own manifest: ownRoot is all we can offer
+	}
+	return roots.find((dir) => fs.existsSync(path.join(dir, "build.json"))) ?? null;
+};
 
 const pkgVersion = (name, from) => {
 	let dir = from;
@@ -34,11 +56,16 @@ const binaryName = process.platform === "win32" ? "plugin.exe" : "plugin";
 export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 	const Console = logger(quiet);
 
-	// Absent in a source checkout that has not been built yet; nothing to install then.
-	if (!fs.existsSync(path.join(pkgRoot, "build.json"))) return false;
+	// Null on an unsupported platform, under --omit=optional, or in a source checkout that
+	// has not been built yet; ttsc cold-builds exactly as it would without us.
+	const root = artifactRoot();
+	if (root === null) {
+		Console.log(`typia-binary: no prebuilt plugin for ${process.platform}/${process.arch}; ttsc will build it`);
+		return false;
+	}
 	let meta;
 	try {
-		meta = JSON.parse(fs.readFileSync(path.join(pkgRoot, "build.json"), "utf8"));
+		meta = JSON.parse(fs.readFileSync(path.join(root, "build.json"), "utf8"));
 	} catch {
 		Console.warn("typia-binary: build.json is unreadable; skipping cache warm");
 		return false;
@@ -62,7 +89,7 @@ export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 		throw new Error("Project must install the exact combination of the dependencies!");
 	}
 
-	const src = path.join(pkgRoot, "plugins");
+	const src = path.join(root, "plugins");
 	const dest = path.join(cacheRoot(consumer, cacheDir), "plugins");
 	const keys = meta.keys.filter((key) => fs.existsSync(path.join(src, key, binaryName)));
 	const todo = keys.filter((key) => force || !fs.existsSync(path.join(dest, key, binaryName)));

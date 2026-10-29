@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yargs from "yargs";
-import packageJson from "../package.json" with { type: "json" };
+import manifest from "../package.json" with { type: "json" };
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
@@ -13,7 +13,7 @@ const p = (...segments: string[]) => path.join(root, ...segments);
 // ttsc names the compiled plugin `plugin`, except on Windows where it is `plugin.exe`.
 const BINARY = process.platform === "win32" ? "plugin.exe" : "plugin";
 
-const { from: seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
+const { from: seed, out, packageName, packageVersion, platforms, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
 	await yargs(
 		process.argv,
 	)
@@ -30,7 +30,7 @@ const { from: seed, out, packageName, packageVersion, buildVersionTtsc, buildVer
 		})
 		.option("package-version", {
 			type: "string",
-			default: packageJson.version,
+			default: manifest.version,
 		})
 		.option("out", {
 			alias: "o",
@@ -43,52 +43,63 @@ const { from: seed, out, packageName, packageVersion, buildVersionTtsc, buildVer
 			type: "string",
 			description: "Seed plugins from a warm cache dir instead of compiling",
 		})
+		.option("platforms", {
+			type: "string",
+			default: manifest.typiaBinary.platforms.join(","),
+			description: "Platforms the umbrella publishes. Refuses to build one not listed",
+		})
 		.parseAsync();
+
+const supported = String(platforms).split(/[\s,]+/).filter(Boolean);
+const self = `${process.platform}-${process.arch}`;
+if (!supported.includes(self)) {
+	throw new Error(`refusing to build ${self}: not in --platforms (${supported.join(", ")})`);
+}
 
 if (out === root || out.startsWith(p("package") + path.sep)) throw new Error(`Refusing to clean ${out}`);
 await fs.rm(out, { force: true, recursive: true });
-await fs.cp(p("package"), out, { force: true, recursive: true });
+await fs.mkdir(out, { recursive: true })
 await fs.writeFile(
 	path.join(out, "package.json"),
 	JSON.stringify(
-		create(packageJson, draft => {
+		create(manifest, draft => {
 			draft.name = `${packageName}-${process.platform}-${process.arch}`;
 			draft.version = packageVersion;
 
-			draft.bin = {
-				"typia-binary": "bin/typia-binary.mjs",
-			};
-
+			// Artifacts only: the umbrella owns bin/lib and the postinstall that copies these.
 			draft.files = [
-				"bin",
-				"lib",
 				"plugins",
 				"build.json",
 				"package.json",
-				"README.md",
 			] as never[];
 
 			// @ts-expect-error
 			delete draft.engines.node;
 
 			// @ts-expect-error
-			delete draft.scripts.build;
-			// @ts-expect-error
-			draft.scripts.postinstall = "node bin/typia-binary.mjs install";
+			delete draft.typiaBinary;
 
-			draft.peerDependencies = {
-				ttsc: buildVersionTtsc,
-				typescript: buildVersionTypescript,
-				typia: buildVersionTypia,
-			};
+			// @ts-expect-error
+			draft.scripts = {};
 
 			// @ts-expect-error
 			draft.dependencies = {};
+			// Needed only by the `npm install` below, which must fetch the toolchain it
+			// compiles against. npm never installs a dependency's devDependencies.
+			draft.devDependencies = {
+				ttsc: buildVersionTtsc,
+				typescript: buildVersionTypescript,
+				typia: buildVersionTypia,
+			} as never;
+
+			// What makes npm install only the matching package from the umbrella.
 			// @ts-expect-error
-			draft.devDependencies = {};
+			draft.os = [process.platform];
+			// @ts-expect-error
+			draft.cpu = [process.arch];
 		}),
 		null,
-		4,
+		'\t',
 	),
 	{ encoding: "utf-8", flag: "w" },
 );
