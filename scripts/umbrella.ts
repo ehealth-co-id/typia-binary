@@ -1,15 +1,15 @@
 #!/usr/bin/env node
+import { create } from "mutative";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yargs from "yargs";
 import manifest from "../package.json" with { type: "json" };
-import { create } from 'mutative'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
-const { out, packageName, packageVersion, platforms } = await yargs(process.argv)
+const { "umbrella-out": out, packageName, packageVersion, platforms } = await yargs(process.argv)
 	.env("TYPIA_BUILD")
 	.option("package-name", {
 		type: "string",
@@ -23,7 +23,9 @@ const { out, packageName, packageVersion, platforms } = await yargs(process.argv
 		type: "string",
 		default: manifest.typiaBinary.platforms.join(","),
 	})
-	.option("out", {
+	// Deliberately not `--out`: this script rm -rf's its target, and sharing TYPIA_BUILD_OUT
+	// with scripts/build.ts would let one exported variable delete the platform package.
+	.option("umbrella-out", {
 		alias: "o",
 		type: "string",
 		default: p("dist-umbrella"),
@@ -67,7 +69,6 @@ await fs.writeFile(
 			// @ts-expect-error
 			draft.scripts = { postinstall: "node bin/typia-binary.mjs install" };
 
-
 			// @ts-expect-error
 			draft.dependencies = {};
 			// Needed only by the `npm install` below, which must fetch the toolchain it
@@ -82,10 +83,10 @@ await fs.writeFile(
 			// @ts-expect-error
 			draft.optionalDependencies = Object.fromEntries(
 				supported.map(platform => [`${packageName}-${platform}`, packageVersion]),
-			)
+			);
 		}),
 		null,
-		'\t',
+		"\t",
 	),
 	{ encoding: "utf-8", flag: "w" },
 );

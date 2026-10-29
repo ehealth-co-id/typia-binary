@@ -21,6 +21,11 @@
 	},
 	"engines": { "node": ">=24" },
 	"typiaBinary": {
-		"platforms": ["linux-x64", "win32-x64", "darwin-x64"]
+		"platforms": ["linux-x64", "win32-x64", "darwin-x64"],
+		"build": {
+			"typia": "15.0.1",
+			"ttsc": "0.30.4",
+			"typescript": "7.0.2"
+		}
 	}
 }

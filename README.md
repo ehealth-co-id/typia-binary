@@ -9,7 +9,8 @@ Because I want our build agent to just skip the tooling build ceremony and just 
 ## Use
 
 Before installing the package, make sure to:
-1. Use the EXACT matching versions of `ttsc`, `typia`, and `typescript`. 
-2. Use default GO flags when running ttsc. Don't set any flag like `CGO_ENABLED`, etc. 
+
+1. Use the EXACT matching versions of `ttsc`, `typia`, and `typescript`.
+2. Use default GO flags when running ttsc. Don't set any flag like `CGO_ENABLED`, etc.
 
 Install the package: `npm install @slainless/typia-binary` then allow the postinstall to run.

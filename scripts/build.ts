@@ -13,52 +13,63 @@ const p = (...segments: string[]) => path.join(root, ...segments);
 // ttsc names the compiled plugin `plugin`, except on Windows where it is `plugin.exe`.
 const BINARY = process.platform === "win32" ? "plugin.exe" : "plugin";
 
-const { from: seed, out, packageName, packageVersion, platforms, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
-	await yargs(
-		process.argv,
-	)
-		// Every option below is also readable from the environment as TYPIA_BUILD_<OPTION>
-		// (TYPIA_BUILD_FROM, TYPIA_BUILD_OUT, TYPIA_BUILD_PACKAGE_VERSION,
-		// TYPIA_BUILD_BUILD_VERSION_TYPIA, …). A CLI flag wins over the env var.
-		.env("TYPIA_BUILD")
-		.option("build-version-ttsc", { type: "string", default: "0.30.4" })
-		.option("build-version-typescript", { type: "string", default: "7.0.2" })
-		.option("build-version-typia", { type: "string", default: "15.0.1" })
-		.option("package-name", {
-			type: "string",
-			default: "typia-binary",
-		})
-		.option("package-version", {
-			type: "string",
-			default: manifest.version,
-		})
-		.option("out", {
-			alias: "o",
-			type: "string",
-			default: p("dist"),
-			description: "Output directory",
-		})
-		.option("from", {
-			alias: "seed",
-			type: "string",
-			description: "Seed plugins from a warm cache dir instead of compiling",
-		})
-		.option("platforms", {
-			type: "string",
-			default: manifest.typiaBinary.platforms.join(","),
-			description: "Platforms the umbrella publishes. Refuses to build one not listed",
-		})
-		.parseAsync();
+const {
+	from: seed,
+	out,
+	packageName,
+	packageVersion,
+	platforms,
+	buildVersionTtsc,
+	buildVersionTypescript,
+	buildVersionTypia,
+} = await yargs(
+	process.argv,
+)
+	// Every option below is also readable from the environment as TYPIA_BUILD_<OPTION>
+	// (TYPIA_BUILD_FROM, TYPIA_BUILD_OUT, TYPIA_BUILD_PACKAGE_VERSION,
+	// TYPIA_BUILD_BUILD_VERSION_TYPIA, …). A CLI flag wins over the env var.
+	.env("TYPIA_BUILD")
+	.option("build-version-ttsc", { type: "string", default: manifest.typiaBinary.build.ttsc })
+	.option("build-version-typescript", { type: "string", default: manifest.typiaBinary.build.typescript })
+	.option("build-version-typia", { type: "string", default: manifest.typiaBinary.build.typia })
+	.option("package-name", {
+		type: "string",
+		default: "typia-binary",
+	})
+	.option("package-version", {
+		type: "string",
+		default: manifest.version,
+	})
+	.option("out", {
+		alias: "o",
+		type: "string",
+		default: p("dist"),
+		description: "Output directory",
+	})
+	.option("from", {
+		alias: "seed",
+		type: "string",
+		description: "Seed plugins from a warm cache dir instead of compiling",
+	})
+	.option("platforms", {
+		type: "string",
+		default: manifest.typiaBinary.platforms.join(","),
+		description: "Platforms the umbrella publishes. Refuses to build one not listed",
+	})
+	.parseAsync();
 
 const supported = String(platforms).split(/[\s,]+/).filter(Boolean);
 const self = `${process.platform}-${process.arch}`;
 if (!supported.includes(self)) {
 	throw new Error(`refusing to build ${self}: not in --platforms (${supported.join(", ")})`);
 }
+// Validate the cheap inputs before the first expensive step, so a typo cannot cost a
+// 240 MB `npm install`.
+if (seed && !(await fs.stat(seed).catch(() => null))) throw new Error(`--from dir not found: ${seed}`);
 
 if (out === root || out.startsWith(p("package") + path.sep)) throw new Error(`Refusing to clean ${out}`);
 await fs.rm(out, { force: true, recursive: true });
-await fs.mkdir(out, { recursive: true })
+await fs.mkdir(out, { recursive: true });
 await fs.writeFile(
 	path.join(out, "package.json"),
 	JSON.stringify(
@@ -99,7 +110,7 @@ await fs.writeFile(
 			draft.cpu = [process.arch];
 		}),
 		null,
-		'\t',
+		"\t",
 	),
 	{ encoding: "utf-8", flag: "w" },
 );
@@ -117,8 +128,6 @@ await fs.writeFile(
 	),
 	{ encoding: "utf-8", flag: "w" },
 );
-run("npm install", out);
-
 let pluginKeys: string[];
 if (seed) {
 	const source = await fs.stat(path.join(seed, "plugins"))
@@ -136,6 +145,7 @@ if (seed) {
 	}
 	console.log(`seeded from ${source}`);
 } else {
+	run("npm install", out);
 	run("npx ttsc prepare --cache-dir .", out);
 	pluginKeys = await getPlugins(path.join(out, "plugins"));
 }
