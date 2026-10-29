@@ -10,10 +10,14 @@ import packageJson from "../package.json" with { type: "json" };
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
-const { seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
+const { from: seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTypescript, buildVersionTypia } =
 	await yargs(
 		process.argv,
 	)
+		// Every option below is also readable from the environment as TYPIA_BUILD_<OPTION>
+		// (TYPIA_BUILD_FROM, TYPIA_BUILD_OUT, TYPIA_BUILD_PACKAGE_VERSION,
+		// TYPIA_BUILD_BUILD_VERSION_TYPIA, …). A CLI flag wins over the env var.
+		.env("TYPIA_BUILD")
 		.option("build-version-ttsc", { type: "string", default: "0.30.4" })
 		.option("build-version-typescript", { type: "string", default: "7.0.2" })
 		.option("build-version-typia", { type: "string", default: "15.0.1" })
@@ -31,9 +35,10 @@ const { seed, out, packageName, packageVersion, buildVersionTtsc, buildVersionTy
 			default: p("dist"),
 			description: "Output directory",
 		})
-		.option("seed", {
+		.option("from", {
+			alias: "seed",
 			type: "string",
-			description: "Seed plugins from directory",
+			description: "Seed plugins from a warm cache dir instead of compiling",
 		})
 		.parseAsync();
 
@@ -98,13 +103,13 @@ await fs.writeFile(
 	),
 	{ encoding: "utf-8", flag: "w" },
 );
-execSync("npm install", { cwd: out, stdio: "inherit" });
+run("npm install", out);
 
 let pluginKeys: string[];
 if (seed) {
 	const source = await fs.stat(path.join(seed, "plugins"))
 			.then(v => v.isDirectory())
-			.catch(v => null)
+			.catch(() => null)
 		? path.join(seed, "plugins")
 		: seed;
 
@@ -117,7 +122,7 @@ if (seed) {
 	}
 	console.log(`seeded from ${source}`);
 } else {
-	execSync("npx ttsc prepare --cache-dir .", { cwd: out, stdio: "inherit" });
+	run("npx ttsc prepare --cache-dir .", out);
 	pluginKeys = await getPlugins(path.join(out, "plugins"));
 }
 
@@ -144,12 +149,12 @@ async function keysIn(dir: string) {
 					.map((entry) =>
 						fs.stat(path.join(dir, entry.name, "plugin"))
 							.then(e => [entry, e] as const)
-							.catch(v => [entry, null] as const)
+							.catch(() => [entry, null] as const)
 					),
 			)
 				.then((entry) =>
 					entry
-						.filter(([dir, plugin]) => plugin?.isFile())
+						.filter(([, plugin]) => plugin?.isFile())
 						.map(([dir]) => dir.name)
 				);
 		});
@@ -160,4 +165,12 @@ async function getPlugins(dir: string) {
 	if (!keys.length) throw new Error("no plugin binary produced or found");
 
 	return keys;
+}
+
+function run(cmd: string, cwd: string) {
+	try {
+		execSync(cmd, { cwd, stdio: "inherit" });
+	} catch (error) {
+		throw new Error(`build step failed: ${cmd}`, { cause: error });
+	}
 }

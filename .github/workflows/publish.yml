@@ -27,9 +27,12 @@ jobs:
 
       - run: npm ci
 
-      # Cold Go build happens here. Fails if the plugin cannot be compiled on the runner.
       - run: npm run build
 
-      - run: npm publish --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: publish
+        run: |
+          test -s dist/build.json
+          test -d dist/plugins
+          npm publish ./dist --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
