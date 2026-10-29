@@ -1,0 +1,21 @@
+{
+	"useTabs": true,
+	"typescript": {
+	},
+	"json": {
+	},
+	"markdown": {
+	},
+	"yaml": {
+	},
+	"excludes": [
+		"**/node_modules",
+		"**/*-lock.json"
+	],
+	"plugins": [
+		"npm:@dprint/typescript@0.96.1",
+		"npm:@dprint/json@0.25.2",
+		"npm:@dprint/markdown@0.28.2",
+		"npm:dprint-plugin-yaml@0.6.0"
+	]
+}

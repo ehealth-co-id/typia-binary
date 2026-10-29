@@ -1,0 +1,22 @@
+{
+	"name": "typia-binary-factory",
+	"version": "0.0.1",
+	"description": "Prebuilt ttsc plugin cache for typia. Removes the cold Go build from every consumer machine and container.",
+	"license": "MIT",
+	"type": "module",
+	"bin": {},
+	"files": [],
+	"scripts": {
+		"build": "node scripts/build.ts"
+	},
+	"peerDependencies": {},
+	"dependencies": {
+		"mutative": "^2.0.1",
+		"yargs": "^18.2.0"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.6",
+		"@types/yargs": "^17.0.35",
+		"dprint": "^0.64.3"
+	}
+}
