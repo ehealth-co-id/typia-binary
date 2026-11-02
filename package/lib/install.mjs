@@ -91,7 +91,7 @@ export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 
 	const src = path.join(root, "plugins");
 	const dest = path.join(cacheRoot(consumer, cacheDir), "plugins");
-	const keys = meta.keys.filter((key) => fs.existsSync(path.join(src, key, binaryName)));
+	const keys = meta.pluginKeys.filter((key) => fs.existsSync(path.join(src, key, binaryName)));
 	const todo = keys.filter((key) => force || !fs.existsSync(path.join(dest, key, binaryName)));
 
 	if (!todo.length) {

@@ -3,6 +3,10 @@
 	"version": "0.0.1",
 	"description": "Prebuilt ttsc plugin cache for typia. Removes the cold Go build from every consumer machine and container.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ehealth-co-id/typia-binary.git"
+	},
 	"type": "module",
 	"bin": {},
 	"files": [],

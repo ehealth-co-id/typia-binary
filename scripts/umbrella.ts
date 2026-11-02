@@ -13,7 +13,8 @@ const { "umbrella-out": out, packageName, packageVersion, platforms } = await ya
 	.env("TYPIA_BUILD")
 	.option("package-name", {
 		type: "string",
-		default: "typia-binary",
+		// Scoped: GitHub Packages refuses unscoped names.
+		default: "@ehealth-co-id/typia-binary",
 	})
 	.option("package-version", {
 		type: "string",

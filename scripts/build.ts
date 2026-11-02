@@ -34,7 +34,9 @@ const {
 	.option("build-version-typia", { type: "string", default: manifest.typiaBinary.build.typia })
 	.option("package-name", {
 		type: "string",
-		default: "typia-binary",
+		// Scoped: GitHub Packages refuses unscoped names. The platform suffix is appended
+		// below, so this yields @ehealth-co-id/typia-binary-linux-x64 etc.
+		default: "@ehealth-co-id/typia-binary",
 	})
 	.option("package-version", {
 		type: "string",

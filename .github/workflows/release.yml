@@ -48,7 +48,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      id-token: write # npm provenance
+      packages: write # GITHUB_TOKEN publishes to GitHub Packages in this repo only
     defaults:
       run:
         shell: bash
@@ -58,10 +58,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `registry-url`: it writes a *global* registry= into .npmrc, which would send
+      # every unscoped dep below to npm.pkg.github.com. The committed .npmrc routes only
+      # the @ehealth-co-id scope instead.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           cache: npm
 
       - run: npm ci --omit=dev
@@ -79,9 +81,12 @@ jobs:
         run: |
           test -s dist/build.json
           test -d dist/plugins
-          npm publish ./dist --provenance --access public $DRY_RUN
+          # No --registry: the scope map in .npmrc picks npm.pkg.github.com.
+          # No --provenance: attestations are npmjs-only. No --access: visibility comes
+          # from the repository.
+          npm publish ./dist $DRY_RUN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   umbrella:
     # Needs the platform packages to exist on the registry first: the published umbrella
@@ -90,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm provenance
+      packages: write # GITHUB_TOKEN publishes to GitHub Packages in this repo only
     defaults:
       run:
         shell: bash
@@ -103,7 +108,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           cache: npm
 
       # Metadata only — no Go toolchain, no compile.
@@ -114,6 +118,6 @@ jobs:
       - name: publish
         run: |
           test -s dist-umbrella/package.json
-          npm publish ./dist-umbrella --provenance --access public $DRY_RUN
+          npm publish ./dist-umbrella $DRY_RUN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
