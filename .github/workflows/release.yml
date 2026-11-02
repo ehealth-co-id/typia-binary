@@ -86,7 +86,7 @@ jobs:
           # from the repository.
           npm publish ./dist $DRY_RUN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
   umbrella:
     # Needs the platform packages to exist on the registry first: the published umbrella
@@ -120,4 +120,4 @@ jobs:
           test -s dist-umbrella/package.json
           npm publish ./dist-umbrella $DRY_RUN
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
