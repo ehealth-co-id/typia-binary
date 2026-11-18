@@ -101,11 +101,17 @@ export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 		);
 	}
 
+	const destKey = local.key ?? meta.pluginKey;
+
 	fs.mkdirSync(dest, { recursive: true });
-	fs.cpSync(path.join(src, meta.pluginKey), path.join(dest, local.key), { recursive: true });
+	if (!force && fs.existsSync(path.join(dest, destKey, binaryName))) {
+		Console.log(`typia-binary: cache already warm at ${dest}`);
+		return true;
+	}
+	fs.cpSync(path.join(src, meta.pluginKey), path.join(dest, destKey), { recursive: true });
 
 	Console.log(
-		`typia-binary: warmed plugin binary (typia ${meta.packages.typia}, ttsc ${meta.packages.ttsc}) from ${meta.pluginKey} to ${local.key}`,
+		`typia-binary: warmed plugin binary (typia ${meta.packages.typia}, ttsc ${meta.packages.ttsc}) from ${meta.pluginKey} to ${destKey}`,
 	);
 
 	return true;
