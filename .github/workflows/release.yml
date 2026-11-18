@@ -7,6 +7,10 @@ on:
         description: "npm publish --dry-run only (no registry write)"
         type: boolean
         default: false
+      stage:
+        description: "Stage instead of publishing (npm stage publish; a maintainer approves later)"
+        type: boolean
+        default: false
       package_version:
         description: "Version to publish. Leave empty on a v* tag to use the tag."
         type: string
@@ -56,6 +60,9 @@ jobs:
       BINARY_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
       BINARY_BUILD_PACKAGE_NAME: ${{ vars.BINARY_BUILD_PACKAGE_NAME }}
       DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+      # `npm stage publish` defers the 2FA proof-of-presence to an approval step, so CI can
+      # hand over a build a maintainer promotes later. Same flags either way.
+      PUBLISH: ${{ inputs.stage && 'stage publish' || 'publish' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +73,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      # `npm stage` landed in npm 11.15.0; node 24 still bundles 11.12.1.
+      - run: npm install -g npm@^11.21.3
 
       - run: npm ci --omit=dev
 
@@ -117,7 +127,7 @@ jobs:
           test -d dist/plugins
           # No --registry: .npmrc maps each scope to its registry.
           # --access public: a scoped package defaults to restricted on npmjs.
-          npm publish ./dist $DRY_RUN --access public
+          npm $PUBLISH ./dist $DRY_RUN --access public
         env:
           NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
@@ -136,6 +146,7 @@ jobs:
       UMBRELLA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
       UMBRELLA_BUILD_PACKAGE_NAME: ${{ vars.UMBRELLA_BUILD_PACKAGE_NAME }}
       DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+      PUBLISH: ${{ inputs.stage && 'stage publish' || 'publish' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -143,6 +154,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      # `npm stage` landed in npm 11.15.0; node 24 still bundles 11.12.1.
+      - run: npm install -g npm@^11.21.3
 
       # Metadata only — no Go toolchain, no compile.
       - run: npm ci --omit=dev
@@ -152,6 +166,6 @@ jobs:
       - name: publish
         run: |
           test -s dist-umbrella/package.json
-          npm publish ./dist-umbrella $DRY_RUN --access public
+          npm $PUBLISH ./dist-umbrella $DRY_RUN --access public
         env:
           NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
