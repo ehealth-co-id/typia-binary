@@ -115,13 +115,11 @@ jobs:
         run: |
           test -s dist/build.json
           test -d dist/plugins
-          # No --registry: the scope map in .npmrc picks npm.pkg.github.com.
-          # No --provenance: attestations are npmjs-only. No --access: visibility comes
-          # from the repository.
-          npm publish ./dist $DRY_RUN
+          # No --registry: .npmrc maps each scope to its registry.
+          # --access public: a scoped package defaults to restricted on npmjs.
+          npm publish ./dist $DRY_RUN --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
   umbrella:
     # Needs the platform packages to exist on the registry first: the published umbrella
@@ -154,7 +152,6 @@ jobs:
       - name: publish
         run: |
           test -s dist-umbrella/package.json
-          npm publish ./dist-umbrella $DRY_RUN
+          npm publish ./dist-umbrella $DRY_RUN --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
