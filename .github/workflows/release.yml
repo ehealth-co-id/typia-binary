@@ -121,6 +121,7 @@ jobs:
           npm publish ./dist $DRY_RUN
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
 
   umbrella:
     # Needs the platform packages to exist on the registry first: the published umbrella
@@ -156,3 +157,4 @@ jobs:
           npm publish ./dist-umbrella $DRY_RUN
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
