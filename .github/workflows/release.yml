@@ -69,9 +69,42 @@ jobs:
 
       - run: npm ci --omit=dev
 
+      # The compiled plugin itself: on an exact key hit the Go build is skipped entirely,
+      # because build.ts's `--from` seed path copies this instead of running ttsc.
+      #
+      # No restore-keys, deliberately. A partial match would seed a plugin built for a
+      # different typia/ttsc/typescript triple and then publish it under the new one. The
+      # key already encodes the triple (package.json) and the pinned deps (lockfile).
+      - uses: actions/cache@v4
+        id: plugin
+        with:
+          path: ${{ github.workspace }}/.ttsc-plugin-cache
+          key: ttsc-plugin-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'package-lock.json') }}
+
       # Cold Go build. Do NOT set CGO_ENABLED: ttsc hashes `go env CGO_ENABLED` into the
       # cache key, so forcing 0 would make every consumer's default-1 key miss.
-      - run: npm run build
+      #
+      # A plugin-cache miss is the only path that compiles. Speed those up by also caching
+      # ttsc's Go object accelerator (TTSC_GO_CACHE_DIR set to a dir outside dist/, which
+      # build.ts deletes, and that dir cached) under
+      # `if: steps.plugin.outputs.cache-hit != 'true'` — ~3 GB per leg against the 10 GB
+      # repo budget, and worth it only if triple-bump compiles hurt.
+      - name: build
+        run: |
+          if [ "$PLUGIN_CACHE_HIT" = "true" ]; then
+            npm run build -- --from .ttsc-plugin-cache
+          else
+            npm run build
+          fi
+        env:
+          PLUGIN_CACHE_HIT: ${{ steps.plugin.outputs.cache-hit }}
+
+      # Missed, so we just compiled: keep it for the next publish of the same triple. On a
+      # hit actions/cache skips the save, and this is the same bytes that were restored.
+      - if: steps.plugin.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .ttsc-plugin-cache
+          cp -r dist/plugins .ttsc-plugin-cache/
 
       # One linux artifact has to serve glibc and musl alike; a dynamic binary would
       # quietly stop working on Alpine, so fail instead of publishing one.
