@@ -25,10 +25,7 @@ const {
 } = await yargs(
 	process.argv,
 )
-	// Every option below is also readable from the environment as TYPIA_BUILD_<OPTION>
-	// (TYPIA_BUILD_FROM, TYPIA_BUILD_OUT, TYPIA_BUILD_PACKAGE_VERSION,
-	// TYPIA_BUILD_BUILD_VERSION_TYPIA, …). A CLI flag wins over the env var.
-	.env("TYPIA_BUILD")
+	.env("BINARY_BUILD")
 	.option("build-version-ttsc", { type: "string", default: manifest.typiaBinary.build.ttsc })
 	.option("build-version-typescript", { type: "string", default: manifest.typiaBinary.build.typescript })
 	.option("build-version-typia", { type: "string", default: manifest.typiaBinary.build.typia })

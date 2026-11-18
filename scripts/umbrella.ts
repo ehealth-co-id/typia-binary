@@ -9,8 +9,8 @@ import manifest from "../package.json" with { type: "json" };
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
-const { "umbrella-out": out, packageName, packageVersion, platforms } = await yargs(process.argv)
-	.env("TYPIA_BUILD")
+const { out, packageName, packageVersion, platforms } = await yargs(process.argv)
+	.env("UMBRELLA_BUILD")
 	.option("package-name", {
 		type: "string",
 		// Scoped: GitHub Packages refuses unscoped names.
@@ -26,7 +26,7 @@ const { "umbrella-out": out, packageName, packageVersion, platforms } = await ya
 	})
 	// Deliberately not `--out`: this script rm -rf's its target, and sharing TYPIA_BUILD_OUT
 	// with scripts/build.ts would let one exported variable delete the platform package.
-	.option("umbrella-out", {
+	.option("out", {
 		alias: "o",
 		type: "string",
 		default: p("dist-umbrella"),
