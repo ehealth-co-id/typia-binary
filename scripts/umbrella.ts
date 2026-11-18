@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import yargs from "yargs";
 import manifest from "../package.json" with { type: "json" };
 
+const DEFAULT_PACKAGE_NAME = "@ehealth-co-id/typia-binary";
+
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
@@ -13,8 +15,8 @@ const { out, packageName, packageVersion, platforms } = await yargs(process.argv
 	.env("UMBRELLA_BUILD")
 	.option("package-name", {
 		type: "string",
-		// Scoped: GitHub Packages refuses unscoped names.
-		default: "@ehealth-co-id/typia-binary",
+		default: DEFAULT_PACKAGE_NAME,
+		coerce: v => v || DEFAULT_PACKAGE_NAME,
 	})
 	.option("package-version", {
 		type: "string",

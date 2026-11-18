@@ -54,7 +54,7 @@ jobs:
         shell: bash
     env:
       BINARY_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
-      UMBRELLA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
+      BINARY_BUILD_PACKAGE_NAME: ${{ vars.BINARY_BUILD_PACKAGE_NAME }}
       DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +134,8 @@ jobs:
       run:
         shell: bash
     env:
-      TYPIA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
+      UMBRELLA_BUILD_PACKAGE_VERSION: ${{ needs.version.outputs.value }}
+      UMBRELLA_BUILD_PACKAGE_NAME: ${{ vars.UMBRELLA_BUILD_PACKAGE_NAME }}
       DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
     steps:
       - uses: actions/checkout@v4

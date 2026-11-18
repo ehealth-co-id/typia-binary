@@ -10,8 +10,8 @@ import manifest from "../package.json" with { type: "json" };
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const p = (...segments: string[]) => path.join(root, ...segments);
 
-// ttsc names the compiled plugin `plugin`, except on Windows where it is `plugin.exe`.
 const BINARY = process.platform === "win32" ? "plugin.exe" : "plugin";
+const DEFAULT_PACKAGE_NAME = "@ehealth-co-id/typia-binary";
 
 const {
 	from: seed,
@@ -31,9 +31,8 @@ const {
 	.option("build-version-typia", { type: "string", default: manifest.typiaBinary.build.typia })
 	.option("package-name", {
 		type: "string",
-		// Scoped: GitHub Packages refuses unscoped names. The platform suffix is appended
-		// below, so this yields @ehealth-co-id/typia-binary-linux-x64 etc.
-		default: "@ehealth-co-id/typia-binary",
+		default: DEFAULT_PACKAGE_NAME,
+		coerce: v => v || DEFAULT_PACKAGE_NAME,
 	})
 	.option("package-version", {
 		type: "string",
