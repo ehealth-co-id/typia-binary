@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolvePluginCacheKey } from "./cache-key.mjs";
 import { logger } from "./log.mjs";
 
 const require = createRequire(import.meta.url);
@@ -91,19 +92,20 @@ export const install = ({ quiet = false, force = false, cacheDir } = {}) => {
 
 	const src = path.join(root, "plugins");
 	const dest = path.join(cacheRoot(consumer, cacheDir), "plugins");
-	const keys = meta.pluginKeys.filter((key) => fs.existsSync(path.join(src, key, binaryName)));
-	const todo = keys.filter((key) => force || !fs.existsSync(path.join(dest, key, binaryName)));
 
-	if (!todo.length) {
-		Console.log(`typia-binary: cache already warm at ${dest}`);
-		return true;
+	const local = resolvePluginCacheKey({ consumer });
+	if (local.key === null) {
+		Console.warn(
+			`typia-binary: could not derive the local plugin cache key (${local.reason}); using the shipped one. ` +
+				"Re-run `npx typia-binary install` once ttsc and typia are installed.",
+		);
 	}
 
 	fs.mkdirSync(dest, { recursive: true });
-	for (const key of todo) fs.cpSync(path.join(src, key), path.join(dest, key), { recursive: true });
+	fs.cpSync(path.join(src, meta.pluginKey), path.join(dest, local.key), { recursive: true });
 
 	Console.log(
-		`typia-binary: warmed ${todo.length} plugin binary (typia ${meta.packages.typia}, ttsc ${meta.packages.ttsc}) into ${dest}`,
+		`typia-binary: warmed plugin binary (typia ${meta.packages.typia}, ttsc ${meta.packages.ttsc}) from ${meta.pluginKey} to ${local.key}`,
 	);
 
 	return true;

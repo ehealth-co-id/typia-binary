@@ -139,17 +139,22 @@ if (seed) {
 		: seed;
 
 	pluginKeys = await getPlugins(source);
-
-	await fs.mkdir(path.join(out, "plugins"), { recursive: true });
-	for (const key of pluginKeys) {
-		await fs.mkdir(path.join(out, "plugins", key), { recursive: true });
-		await fs.cp(path.join(source, key, BINARY), path.join(out, "plugins", key, BINARY));
+	if (pluginKeys.length !== 1) {
+		throw new Error(`typia plugin seed must consist of only 1 plugin key, instead got: ${JSON.stringify(pluginKeys)}`)
 	}
+
+	const key = pluginKeys[0]
+	await fs.mkdir(path.join(out, "plugins"), { recursive: true });
+	await fs.mkdir(path.join(out, "plugins", key), { recursive: true });
+	await fs.cp(path.join(source, key, BINARY), path.join(out, "plugins", key, BINARY));
 	console.log(`seeded from ${source}`);
 } else {
 	run("npm install", out);
 	run("npx ttsc prepare --cache-dir .", out);
 	pluginKeys = await getPlugins(path.join(out, "plugins"));
+	if (pluginKeys.length !== 1) {
+		throw new Error(`typia plugin build process produce more than 1 plugin keys: ${JSON.stringify(pluginKeys)}`)
+	}
 }
 
 const meta = {
@@ -160,11 +165,11 @@ const meta = {
 	},
 	platform: process.platform,
 	arch: process.arch,
-	pluginKeys,
+	pluginKey: pluginKeys[0],
 };
 
 await fs.writeFile(path.join(out, "build.json"), JSON.stringify(meta, null, "\t") + "\n");
-console.log(`built ${meta.platform}/${meta.arch}: ${pluginKeys.join(", ")}`);
+console.log(`built ${meta.platform}/${meta.arch}: ${meta.pluginKey}`);
 
 async function keysIn(dir: string) {
 	return fs
